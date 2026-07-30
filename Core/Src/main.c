@@ -33,9 +33,9 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define F_VIDE    65500
-#define F_PLEIN   43900
-#define NB_MESURES 30
+#define BIN_EMPTY_FREQ_HZ   65500  // Calibrated oscillator frequency when the bin is empty
+#define BIN_FULL_FREQ_HZ    43900  // Calibrated oscillator frequency when the bin is full
+#define NUM_SAMPLES         30     // Number of measurements averaged per reading
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -64,15 +64,15 @@ static void MX_USART2_UART_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
-volatile int Is_First_Captured = 0;
-volatile int IC_Value1 = 0;
-volatile int IC_Value2 = 0;
-volatile int Difference = 0;
-volatile int Frequency = 0;
-volatile int CalculationOK = 0;
-char cap_data[50];
-int mesures[30];
-int index_mes = 0;
+volatile int is_first_capture = 0;
+volatile int ic_value_1 = 0;
+volatile int ic_value_2 = 0;
+volatile int capture_difference = 0;
+volatile int measured_frequency = 0;
+volatile int calculation_ready = 0;
+char uart_tx_buffer[50];
+int measurements[NUM_SAMPLES];
+int measurement_index = 0;
 
 
 /* USER CODE END 0 */
@@ -117,35 +117,35 @@ int main(void)
 
   while (1)
   {
-      if (CalculationOK == 1)
+      if (calculation_ready == 1)
       {
-          mesures[index_mes] = Frequency;
-          index_mes++;
+          measurements[measurement_index] = measured_frequency;
+          measurement_index++;
 
-          if (index_mes >= NB_MESURES)
+          if (measurement_index >= NUM_SAMPLES)
           {
-              int somme = 0;
-              for (int i = 0; i < NB_MESURES; i++)
-                  somme += mesures[i];
-              int moyenne = somme / NB_MESURES;
+              int sum = 0;
+              for (int i = 0; i < NUM_SAMPLES; i++)
+                  sum += measurements[i];
+              int average = sum / NUM_SAMPLES;
 
-              int niveau;
-              if (moyenne >= F_VIDE)
-                  niveau = 0;
-              else if (moyenne <= F_PLEIN)
-                  niveau = 100;
+              int fill_level_percent;
+              if (average >= BIN_EMPTY_FREQ_HZ)
+                  fill_level_percent = 0;
+              else if (average <= BIN_FULL_FREQ_HZ)
+                  fill_level_percent = 100;
               else
-                  niveau = (int)(100.0f *
-                      (F_VIDE - moyenne) /
-                      (F_VIDE - F_PLEIN));
+                  fill_level_percent = (int)(100.0f *
+                      (BIN_EMPTY_FREQ_HZ - average) /
+                      (BIN_EMPTY_FREQ_HZ - BIN_FULL_FREQ_HZ));
 
-              sprintf(cap_data, "NIVEAU:%d\r\n", niveau);
+              sprintf(uart_tx_buffer, "LEVEL:%d\r\n", fill_level_percent);
               HAL_UART_Transmit(&huart2,
-                  (uint8_t*)cap_data,
-                  strlen(cap_data), 200);
-              index_mes = 0;
+                  (uint8_t*)uart_tx_buffer,
+                  strlen(uart_tx_buffer), 200);
+              measurement_index = 0;
           }
-          CalculationOK = 0;
+          calculation_ready = 0;
       }
       HAL_Delay(100);
   }
@@ -306,23 +306,23 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim2)
 
 	if (htim2->Channel == HAL_TIM_ACTIVE_CHANNEL_1)
 	{
-		if (Is_First_Captured==0)
+		if (is_first_capture == 0)
 			{
-				IC_Value1 = HAL_TIM_ReadCapturedValue(htim2, TIM_CHANNEL_1);
-				Is_First_Captured=1;
+				ic_value_1 = HAL_TIM_ReadCapturedValue(htim2, TIM_CHANNEL_1);
+				is_first_capture = 1;
 			}
-		else if (Is_First_Captured)
+		else if (is_first_capture)
 		{
-			IC_Value2 = HAL_TIM_ReadCapturedValue(htim2, TIM_CHANNEL_1);
-			if (IC_Value2>IC_Value1)
+			ic_value_2 = HAL_TIM_ReadCapturedValue(htim2, TIM_CHANNEL_1);
+			if (ic_value_2 > ic_value_1)
 						{
-				Difference = IC_Value2 - IC_Value1;
-				Frequency= (float)HAL_RCC_GetHCLKFreq()/(float)Difference;
+				capture_difference = ic_value_2 - ic_value_1;
+				measured_frequency = (float)HAL_RCC_GetHCLKFreq()/(float)capture_difference;
 
-				CalculationOK=1;
+				calculation_ready = 1;
 						}
-			else CalculationOK=0;
-			Is_First_Captured = 0;
+			else calculation_ready = 0;
+			is_first_capture = 0;
 		}
 	}
 }
