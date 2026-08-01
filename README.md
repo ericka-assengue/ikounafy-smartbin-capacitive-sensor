@@ -1,4 +1,4 @@
-<img width="179" height="93" alt="image" src="https://github.com/user-attachments/assets/67e1e8b0-1d1f-423d-a548-3a19418294b1" /># Ikounafy Smartbin — Capacitive Fill-Level Sensing for Waste Bins
+# Ikounafy Smartbin — Capacitive Fill-Level Sensing for Waste Bins
 
 <img width="1200" height="1600" alt="photo ikounafy" src="https://github.com/user-attachments/assets/2245e0bd-5bae-421c-b305-a90fc3de2a8b" />
 
